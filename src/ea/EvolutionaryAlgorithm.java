@@ -99,7 +99,7 @@ public class EvolutionaryAlgorithm {
             }
 
             // Print progress every 100 generations
-            if (generation % 100 == 0 || generation == maxGenerations - 1) {
+            if (generation % 10 == 0 || generation == maxGenerations - 1) {
                 System.out.println("Generacion " + generation
                         + " | Mejor coste: " + String.format("%.2f", currentBest.getTotalCost()));
             }

@@ -16,7 +16,7 @@ public class Main {
         int maxGenerations = 1000;
 
         // Generar ciudades y matriz de costes
-        int numberOfCities = 20;
+        int numberOfCities = 100;
         List<City> cities = generateCities(numberOfCities);
         double[][] costMatrix = generateCostMatrix(numberOfCities);
 
