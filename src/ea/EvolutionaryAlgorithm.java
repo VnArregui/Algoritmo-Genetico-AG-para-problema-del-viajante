@@ -17,11 +17,12 @@ public class EvolutionaryAlgorithm {
     private final int maxGenerations;
     private final List<City> cities;
     private final double[][] costMatrix;
+    private boolean parentSelectionMethod; // true: torneo, false: ranking de mapeo lineal
     private final Random random;
 
     public EvolutionaryAlgorithm(List<City> cities, double[][] costMatrix, int populationSize, int initialPopulationMul,
                                   double crossoverRate, double mutationRate, int tournamentSize,
-                                  int maxGenerations) {
+                                  int maxGenerations, boolean parentSelectionMethod) {
         this.cities = cities;
         this.costMatrix = costMatrix;
         this.populationSize = populationSize;
@@ -30,6 +31,7 @@ public class EvolutionaryAlgorithm {
         this.mutationRate = mutationRate;
         this.tournamentSize = tournamentSize;
         this.maxGenerations = maxGenerations;
+        this.parentSelectionMethod = parentSelectionMethod;
         this.random = new Random();
     }
 
@@ -41,7 +43,7 @@ public class EvolutionaryAlgorithm {
 
         // Si queremos generar más individuos inicialmente, usamos el multiplicador
         int totalInitial = populationSize * initialPopulationMul;
-        
+
         for (int i = 0; i < totalInitial; i++) {
             List<City> shuffled = new ArrayList<>(cities);
             Collections.shuffle(shuffled);
@@ -83,28 +85,22 @@ public class EvolutionaryAlgorithm {
         for (int generation = 0; generation < maxGenerations; generation++) {
             List<Route> newPopulation = new ArrayList<>();
 
-            // Elitism: carry the best individual to the next generation
+            // Elitismo: siempre mantenemos el mejor individuo de la generación anterior
             newPopulation.add(getBestRoute(population));
 
             while (newPopulation.size() < populationSize) {
-                // Selection
-                Route parent1 = Selection.tournamentSelection(population, tournamentSize);
-                Route parent2 = Selection.tournamentSelection(population, tournamentSize);
-
-                // Crossover
-                Route offspring;
-                if (random.nextDouble() < crossoverRate) {
-                    offspring = Crossover.orderCrossover(parent1, parent2);
-                } else {
-                    offspring = new Route(parent1.getCities(), costMatrix);
+                // Seleccion de padres
+                if (parentSelectionMethod) {
+                    Route parent1 = Selection.tournamentSelection(population, tournamentSize);
+                    Route parent2 = Selection.tournamentSelection(population, tournamentSize);
+                    newPopulation.add(getOffSpring(parent1, parent2));
                 }
 
-                // Mutation
-                if (random.nextDouble() < mutationRate) {
-                    Mutation.swapMutation(offspring);
+                else {
+                    Route parent1 = Selection.linearRankingSelection(population);
+                    Route parent2 = Selection.linearRankingSelection(population);
+                    newPopulation.add(getOffSpring(parent1, parent2));
                 }
-
-                newPopulation.add(offspring);
             }
 
             population = newPopulation;
@@ -114,7 +110,7 @@ public class EvolutionaryAlgorithm {
                 globalBest = currentBest;
             }
 
-            // Print progress every 100 generations
+            // Imprimimos el mejor coste cada X generaciones para ver la evolución
             if (generation % 10 == 0 || generation == maxGenerations - 1) {
                 System.out.println("Generacion " + generation
                         + " | Mejor coste: " + String.format("%.2f", currentBest.getTotalCost()));
@@ -122,5 +118,21 @@ public class EvolutionaryAlgorithm {
         }
 
         return globalBest;
+    }
+
+    // Crossover y mutación para generar un nuevo individuo a partir de dos padres
+    public Route getOffSpring(Route parent1, Route parent2) {
+        Route offspring;
+        if (random.nextDouble() < crossoverRate) {
+            offspring = Crossover.orderCrossover(parent1, parent2);
+        } else {
+            offspring = new Route(parent1.getCities(), costMatrix);
+        }
+
+        // Mutation
+        if (random.nextDouble() < mutationRate) {
+            Mutation.swapMutation(offspring);
+        }
+        return offspring;
     }
 }

@@ -15,6 +15,7 @@ public class Main {
         double mutationRate = 0.1;
         int tournamentSize = 5;
         int maxGenerations = 2000;
+        boolean parentSelectionMethod = true; // true: torneo, false: ranking de mapeo lineal
 
         // Generar ciudades y matriz de costes
         int numberOfCities = 100;
@@ -32,7 +33,7 @@ public class Main {
 
         // Ejecutar el algoritmo evolutivo
         EvolutionaryAlgorithm ea = new EvolutionaryAlgorithm(
-                cities, costMatrix, populationSize, initialGenerationsMul, crossoverRate, mutationRate, tournamentSize, maxGenerations);
+                cities, costMatrix, populationSize, initialGenerationsMul, crossoverRate, mutationRate, tournamentSize, maxGenerations, parentSelectionMethod);
 
         Route bestRoute = ea.run();
 
