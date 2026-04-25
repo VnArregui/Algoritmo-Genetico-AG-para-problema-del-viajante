@@ -10,6 +10,7 @@ import model.Route;
 public class EvolutionaryAlgorithm {
 
     private final int populationSize;
+    private final int initialPopulationMul;
     private final double crossoverRate;
     private final double mutationRate;
     private final int tournamentSize;
@@ -18,12 +19,13 @@ public class EvolutionaryAlgorithm {
     private final double[][] costMatrix;
     private final Random random;
 
-    public EvolutionaryAlgorithm(List<City> cities, double[][] costMatrix, int populationSize,
+    public EvolutionaryAlgorithm(List<City> cities, double[][] costMatrix, int populationSize, int initialPopulationMul,
                                   double crossoverRate, double mutationRate, int tournamentSize,
                                   int maxGenerations) {
         this.cities = cities;
         this.costMatrix = costMatrix;
         this.populationSize = populationSize;
+        this.initialPopulationMul = initialPopulationMul;
         this.crossoverRate = crossoverRate;
         this.mutationRate = mutationRate;
         this.tournamentSize = tournamentSize;
@@ -36,7 +38,11 @@ public class EvolutionaryAlgorithm {
      */
     public List<Route> initializePopulation() {
         List<Route> population = new ArrayList<>();
-        for (int i = 0; i < populationSize; i++) {
+
+        // Si queremos generar más individuos inicialmente, usamos el multiplicador
+        int totalInitial = populationSize * initialPopulationMul;
+        
+        for (int i = 0; i < totalInitial; i++) {
             List<City> shuffled = new ArrayList<>(cities);
             Collections.shuffle(shuffled);
             population.add(new Route(shuffled, costMatrix));
@@ -62,6 +68,16 @@ public class EvolutionaryAlgorithm {
      */
     public Route run() {
         List<Route> population = initializePopulation();
+
+        // Si generamos mas individuos inicialmente, hacemos una selección previa para reducir a 'populationSize'
+        if (initialPopulationMul > 1) {
+            List<Route> reduced = new ArrayList<>();
+            for (int i = 0; i < populationSize; i++) {
+                reduced.add(Selection.tournamentSelection(population, tournamentSize));
+            }
+            population = reduced;
+        }
+
         Route globalBest = getBestRoute(population);
 
         for (int generation = 0; generation < maxGenerations; generation++) {

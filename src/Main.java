@@ -10,10 +10,11 @@ public class Main {
     public static void main(String[] args) {
         // Parametros del algoritmo
         int populationSize = 100;
+        int initialGenerationsMul = 5; // multiplicador para generar más individuos inicialmente
         double crossoverRate = 0.9;
         double mutationRate = 0.1;
         int tournamentSize = 5;
-        int maxGenerations = 1000;
+        int maxGenerations = 2000;
 
         // Generar ciudades y matriz de costes
         int numberOfCities = 100;
@@ -31,7 +32,7 @@ public class Main {
 
         // Ejecutar el algoritmo evolutivo
         EvolutionaryAlgorithm ea = new EvolutionaryAlgorithm(
-                cities, costMatrix, populationSize, crossoverRate, mutationRate, tournamentSize, maxGenerations);
+                cities, costMatrix, populationSize, initialGenerationsMul, crossoverRate, mutationRate, tournamentSize, maxGenerations);
 
         Route bestRoute = ea.run();
 
