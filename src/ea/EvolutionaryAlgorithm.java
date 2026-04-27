@@ -95,7 +95,6 @@ public class EvolutionaryAlgorithm {
                     Route parent2 = Selection.tournamentSelection(population, tournamentSize);
                     newPopulation.add(getOffSpring(parent1, parent2));
                 }
-
                 else {
                     Route parent1 = Selection.linearRankingSelection(population);
                     Route parent2 = Selection.linearRankingSelection(population);
