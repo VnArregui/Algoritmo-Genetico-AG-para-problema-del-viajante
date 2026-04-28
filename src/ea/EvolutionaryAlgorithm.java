@@ -17,7 +17,7 @@ public class EvolutionaryAlgorithm {
     private final int maxGenerations;
     private final List<City> cities;
     private final double[][] costMatrix;
-    private boolean parentSelectionMethod; // true: torneo, false: ranking de mapeo lineal
+    private final boolean parentSelectionMethod; // true: torneo, false: ranking de mapeo lineal
     private final Random random;
 
     public EvolutionaryAlgorithm(List<City> cities, double[][] costMatrix, int populationSize, int initialPopulationMul,

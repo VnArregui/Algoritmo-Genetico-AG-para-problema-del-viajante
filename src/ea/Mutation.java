@@ -7,16 +7,10 @@ import model.City;
 import model.Route;
 
 public class Mutation {
-    private Mutation() {
-        /* This utility class should not be instantiated */
-    }
-
-
+    private Mutation() {}
     private static final Random random = new Random();
 
-    /**
-     * Swap mutation: randomly swaps two cities in the route.
-     */
+    // Mutacion por intercambio, selecciona dos ciudades al azar y las intercambia
     public static void swapMutation(Route route) {
         List<City> cities = route.getCities();
         int index1 = random.nextInt(cities.size());
@@ -25,9 +19,7 @@ public class Mutation {
         route.invalidateFitness();
     }
 
-    /**
-     * Inversion mutation: reverses a random sub-section of the route.
-     */
+    // Mutacion por inversión, selecciona un segmento de la ruta y lo invierte
     public static void inversionMutation(Route route) {
         List<City> cities = route.getCities();
         int start = random.nextInt(cities.size());
@@ -42,6 +34,19 @@ public class Mutation {
             start++;
             end--;
         }
+        route.invalidateFitness();
+    }
+
+    // Mutacion por desplazamiento, selecciona una ciudad y la mueve a otra posición
+    public static void shiftMutation(Route route) {
+        List<City> cities = route.getCities();
+        int fromIndex = random.nextInt(cities.size());
+        int toIndex = random.nextInt(cities.size());
+        while (toIndex == fromIndex) {
+            toIndex = random.nextInt(cities.size());
+        }
+        City city = cities.remove(fromIndex);
+        cities.add(toIndex, city);
         route.invalidateFitness();
     }
 }
