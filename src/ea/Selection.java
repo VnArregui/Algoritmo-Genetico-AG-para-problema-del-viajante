@@ -80,4 +80,15 @@ public class Selection {
         }
         return sorted.get(n - 1); // retorna el mejor si falla
     }
+
+    // Seleecion de sobrevivientes por fitness, se ordena la poblacion por fitness y se elige los mejores
+    public static final List<Route> fitnessBasedSelection(List<Route> population, int survivors) {
+        List<Route> sorted = new ArrayList<>(population);
+        sorted.sort(Comparator.comparingDouble(Route::getFitness).reversed());
+        List<Route> selected = new ArrayList<>();
+        for (int i = 0; i < survivors && i < sorted.size(); i++) {
+            selected.add(sorted.get(i));
+        }
+        return selected;
+    }
 }
