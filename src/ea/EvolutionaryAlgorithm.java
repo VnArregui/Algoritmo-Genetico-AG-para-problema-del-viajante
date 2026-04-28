@@ -18,6 +18,7 @@ public class EvolutionaryAlgorithm {
     private final List<City> cities;
     private final double[][] costMatrix;
     private final boolean parentSelectionMethod; // true: torneo, false: ranking de mapeo lineal
+    private final boolean survivalSelectionMethod; // true: round robin, false: fitness-based
     private final Random random;
 
     public EvolutionaryAlgorithm(List<City> cities, double[][] costMatrix, int populationSize, int initialPopulationMul,
@@ -33,6 +34,7 @@ public class EvolutionaryAlgorithm {
         this.maxGenerations = maxGenerations;
         this.parentSelectionMethod = parentSelectionMethod;
         this.random = new Random();
+        this.survivalSelectionMethod = true; // Por defecto, usamos round robin para selección de sobrevivientes
     }
 
     /**
@@ -85,9 +87,6 @@ public class EvolutionaryAlgorithm {
         for (int generation = 0; generation < maxGenerations; generation++) {
             List<Route> newPopulation = new ArrayList<>();
 
-            // Elitismo: siempre mantenemos el mejor individuo de la generación anterior
-            newPopulation.add(getBestRoute(population));
-
             while (newPopulation.size() < populationSize) {
                 // Seleccion de padres
                 if (parentSelectionMethod) {
@@ -102,7 +101,16 @@ public class EvolutionaryAlgorithm {
                 }
             }
 
-            population = newPopulation;
+            // Seleccion de sobrevivientes, si tenemos en cuenta la población vieja, mezclamos ambas y seleccionamos los mejores
+            if (survivalSelectionMethod) {
+                List<Route> combined = new ArrayList<>(population);
+                combined.addAll(newPopulation);
+                population = new ArrayList<>(Selection.roundRobinSelection(combined, tournamentSize, populationSize)); 
+            } else {
+                List<Route> combined = new ArrayList<>(population);
+                combined.addAll(newPopulation);
+                population = Selection.fitnessBasedSelection(combined, populationSize);
+            }
 
             Route currentBest = getBestRoute(population);
             if (currentBest.getFitness() > globalBest.getFitness()) {
