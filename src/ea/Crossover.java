@@ -14,10 +14,7 @@ public class Crossover {
 
     private static final Random random = new Random();
 
-    /**
-     * Order Crossover (OX): a common crossover operator for permutation-based
-     * representations like TSP.
-     */
+    // Order Crossover (OX)
     public static Route orderCrossover(Route parent1, Route parent2) {
         List<City> p1 = parent1.getCities();
         List<City> p2 = parent2.getCities();
@@ -59,10 +56,7 @@ public class Crossover {
             }
         }
 
-        List<City> childList = new ArrayList<>();
-        for (City c : child) {
-            childList.add(c);
-        }
+        List<City> childList = Arrays.asList(child);
         return new Route(childList, parent1.getCostMatrix());
     }
 
@@ -110,6 +104,105 @@ public class Crossover {
             new Route(child1List, parent1.getCostMatrix()),
             new Route(child2List, parent1.getCostMatrix())
         };
+    }
+
+    // Distance Preserving Crossover (DPX).
+    // Fragment-building adapted from Epsilon2/Memetic-Algorithm-for-TSP (MIT license).
+    // Reconnection follows Freisleben & Merz (1996): prefers P1/P2 successor edges.
+    public static Route distancePreservingCrossover(Route parent1, Route parent2) {
+        List<City> p1 = parent1.getCities();
+        List<City> p2 = parent2.getCities();
+        int n = p1.size();
+
+        // Build neighbor array for parent2 (O(1) common-edge lookup)
+        int[][] nb2 = new int[n][2];
+        for (int i = 0; i < n; i++) {
+            int id = p2.get(i).getId();
+            nb2[id][0] = p2.get((i - 1 + n) % n).getId();
+            nb2[id][1] = p2.get((i + 1) % n).getId();
+        }
+
+        // Form fragments by scanning P1:
+        // each fragment is a maximal sequence where consecutive edges are common
+        List<List<Integer>> fragments = new ArrayList<>();
+        int k = 0;
+        while (k < n) {
+            List<Integer> frag = new ArrayList<>();
+            frag.add(p1.get(k).getId());
+            k++;
+            while (k < n) {
+                int prev = p1.get(k - 1).getId();
+                int curr = p1.get(k).getId();
+                if (curr == nb2[prev][0] || curr == nb2[prev][1]) {
+                    frag.add(curr);
+                    k++;
+                } else break;
+            }
+            fragments.add(frag);
+        }
+
+        // Build city-by-ID lookup and successor maps
+        City[] cityById = new City[n];
+        int[] succ1 = new int[n];
+        int[] succ2 = new int[n];
+        for (int i = 0; i < n; i++) {
+            City c = p1.get(i);
+            cityById[c.getId()] = c;
+            succ1[c.getId()] = p1.get((i + 1) % n).getId();
+            succ2[p2.get(i).getId()] = p2.get((i + 1) % n).getId();
+        }
+
+        // Reconnect fragments greedily into a complete tour
+        boolean[] used = new boolean[fragments.size()];
+        List<City> child = new ArrayList<>();
+        int current = 0;
+
+        for (int step = 0; step < fragments.size(); step++) {
+            used[current] = true;
+            List<Integer> frag = fragments.get(current);
+            for (int id : frag) child.add(cityById[id]);
+
+            if (step == fragments.size() - 1) break;
+
+            int tail = frag.get(frag.size() - 1);
+
+            // Prefer fragment whose head matches P1/P2 successor of tail
+            current = -1;
+            for (int j = 0; j < fragments.size(); j++) {
+                if (used[j]) continue;
+                int head = fragments.get(j).get(0);
+                if (head == succ1[tail] || head == succ2[tail]) {
+                    current = j;
+                    break;
+                }
+            }
+
+            // If not found, prefer fragment whose tail matches (reverse it)
+            if (current == -1) {
+                for (int j = 0; j < fragments.size(); j++) {
+                    if (used[j]) continue;
+                    List<Integer> f = fragments.get(j);
+                    int ft = f.get(f.size() - 1);
+                    if (ft == succ1[tail] || ft == succ2[tail]) {
+                        List<Integer> rev = new ArrayList<>(f.size());
+                        for (int idx = f.size() - 1; idx >= 0; idx--)
+                            rev.add(f.get(idx));
+                        fragments.set(j, rev);
+                        current = j;
+                        break;
+                    }
+                }
+            }
+
+            // Fallback: any unused fragment
+            if (current == -1) {
+                for (int j = 0; j < fragments.size(); j++) {
+                    if (!used[j]) { current = j; break; }
+                }
+            }
+        }
+
+        return new Route(child, parent1.getCostMatrix());
     }
 
     private static City resolveMapping(City city, Map<Integer, Integer> crossMap) {

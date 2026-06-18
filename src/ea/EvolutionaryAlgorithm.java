@@ -9,6 +9,9 @@ import model.Route;
 
 public class EvolutionaryAlgorithm {
 
+    public enum CrossoverMethod { ORDER, PMX, DPX }
+    public enum MutationMethod  { SWAP, INVERSION, SHIFT }
+    
     private final int populationSize;
     private final int initialPopulationMul;
     private final double crossoverRate;
@@ -20,10 +23,13 @@ public class EvolutionaryAlgorithm {
     private final boolean parentSelectionMethod; // true: torneo, false: ranking de mapeo lineal
     private final boolean survivalSelectionMethod; // true: round robin, false: fitness-based
     private final Random random;
+    private final CrossoverMethod crossoverMethod;
+    private final MutationMethod mutationMethod;
 
     public EvolutionaryAlgorithm(List<City> cities, double[][] costMatrix, int populationSize, int initialPopulationMul,
                                   double crossoverRate, double mutationRate, int tournamentSize,
-                                  int maxGenerations, boolean parentSelectionMethod) {
+                                  int maxGenerations, boolean parentSelectionMethod, boolean survivalSelectionMethod, 
+                                  CrossoverMethod crossoverMethod, MutationMethod mutationMethod) {
         this.cities = cities;
         this.costMatrix = costMatrix;
         this.populationSize = populationSize;
@@ -34,7 +40,9 @@ public class EvolutionaryAlgorithm {
         this.maxGenerations = maxGenerations;
         this.parentSelectionMethod = parentSelectionMethod;
         this.random = new Random();
-        this.survivalSelectionMethod = true; // Por defecto, usamos round robin para selección de sobrevivientes
+        this.survivalSelectionMethod = survivalSelectionMethod; // Por defecto, usamos round robin para selección de sobrevivientes
+        this.crossoverMethod = crossoverMethod;
+        this.mutationMethod = mutationMethod;
     }
 
     /**
@@ -89,15 +97,19 @@ public class EvolutionaryAlgorithm {
 
             while (newPopulation.size() < populationSize) {
                 // Seleccion de padres
+                Route parent1, parent2;
                 if (parentSelectionMethod) {
-                    Route parent1 = Selection.tournamentSelection(population, tournamentSize);
-                    Route parent2 = Selection.tournamentSelection(population, tournamentSize);
-                    newPopulation.add(getOffSpring(parent1, parent2));
+                    parent1 = Selection.tournamentSelection(population, tournamentSize);
+                    parent2 = Selection.tournamentSelection(population, tournamentSize);
+                } else {
+                    parent1 = Selection.linearRankingSelection(population);
+                    parent2 = Selection.linearRankingSelection(population);
                 }
-                else {
-                    Route parent1 = Selection.linearRankingSelection(population);
-                    Route parent2 = Selection.linearRankingSelection(population);
-                    newPopulation.add(getOffSpring(parent1, parent2));
+
+                for (Route offspring : getOffSpring(parent1, parent2)) {
+                    if (newPopulation.size() < populationSize) {
+                        newPopulation.add(offspring);
+                    }
                 }
             }
 
@@ -127,19 +139,42 @@ public class EvolutionaryAlgorithm {
         return globalBest;
     }
 
-    // Crossover y mutación para generar un nuevo individuo a partir de dos padres
-    public Route getOffSpring(Route parent1, Route parent2) {
-        Route offspring;
+    // Crossover y mutación para generar nuevos individuos a partir de dos padres
+    public List<Route> getOffSpring(Route parent1, Route parent2) {
+        Route[] children;
         if (random.nextDouble() < crossoverRate) {
-            offspring = Crossover.orderCrossover(parent1, parent2);
+            children = getCrossover(parent1, parent2);
         } else {
-            offspring = new Route(parent1.getCities(), costMatrix);
+            children = new Route[] {
+                new Route(parent1.getCities(), costMatrix)
+            };
         }
 
-        // Mutation
-        if (random.nextDouble() < mutationRate) {
-            Mutation.swapMutation(offspring);
+        // Mutacion
+        List<Route> result = new ArrayList<>();
+        for (Route child : children) {
+            if (random.nextDouble() < mutationRate) {
+                getMutation(child);
+            }
+            result.add(child);
         }
-        return offspring;
+        return result;
+    }
+
+    private Route[] getCrossover(Route parent1, Route parent2) {
+        return switch (crossoverMethod) {
+            case ORDER -> new Route[] { Crossover.orderCrossover(parent1, parent2) };
+            case PMX   -> Crossover.partiallyMappedCrossover(parent1, parent2);
+            case DPX   -> new Route[] { Crossover.distancePreservingCrossover(parent1, parent2) };
+        };
+    }
+
+    private void getMutation(Route route) {
+        switch (mutationMethod) {
+            case SWAP -> Mutation.swapMutation(route);
+            case INVERSION -> Mutation.inversionMutation(route);
+            case SHIFT -> Mutation.shiftMutation(route);
+            default -> Mutation.swapMutation(route);
+        }
     }
 }
