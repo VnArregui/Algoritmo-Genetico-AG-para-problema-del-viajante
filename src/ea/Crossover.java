@@ -3,9 +3,11 @@ package ea;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import model.City;
 import model.Route;
 
@@ -65,7 +67,11 @@ public class Crossover {
         List<City> p1 = parent1.getCities();
         List<City> p2 = parent2.getCities();
         int size = p1.size();
-        Map<Integer, Integer> crossMap = new HashMap<>();
+
+        Map<Integer, Integer> map1 = new HashMap<>();
+        Map<Integer, Integer> map2 = new HashMap<>();
+        Set<Integer> segment1 = new HashSet<>(); // ids copiados en child1 (segmento de p1)
+        Set<Integer> segment2 = new HashSet<>(); // ids copiados en child2 (segmento de p2)
 
         City[] child1 = new City[size];
         City[] child2 = new City[size];
@@ -81,22 +87,21 @@ public class Crossover {
         for (int i = start; i <= end; i++) {
             child1[i] = p1.get(i);
             child2[i] = p2.get(i);
-            crossMap.put(p1.get(i).getId(), p2.get(i).getId());
-        }
-        
-        for (int i = 0; i < start; i++) {
-            child1[i] = resolveMapping(p2.get(i), crossMap);
-            child2[i] = resolveMapping(p1.get(i), crossMap);
+            map1.put(p1.get(i).getId(), p2.get(i).getId());
+            map2.put(p2.get(i).getId(), p1.get(i).getId());
+            segment1.add(p1.get(i).getId());
+            segment2.add(p2.get(i).getId());
         }
 
-        for (int i = end + 1; i < size; i++) {
-            child1[i] = resolveMapping(p2.get(i), crossMap);
-            child2[i] = resolveMapping(p1.get(i), crossMap);
+        for (int i = 0; i < size; i++) {
+            if (i >= start && i <= end) continue;
+            child1[i] = resolveMapping(p2.get(i), map1, segment1);
+            child2[i] = resolveMapping(p1.get(i), map2, segment2);
         }
 
         List<City> child1List = new ArrayList<>();
         List<City> child2List = new ArrayList<>();
-        
+
         child1List.addAll(Arrays.asList(child1));
         child2List.addAll(Arrays.asList(child2));
 
@@ -205,10 +210,11 @@ public class Crossover {
         return new Route(child, parent1.getCostMatrix());
     }
 
-    private static City resolveMapping(City city, Map<Integer, Integer> crossMap) {
-        if (!crossMap.containsKey(city.getId())) {
-            return city;
-        } 
-        return new City(crossMap.get(city.getId()));
+    private static City resolveMapping(City city, Map<Integer, Integer> map, Set<Integer> segment) {
+        int id = city.getId();
+        while (segment.contains(id)) {
+            id = map.get(id);
+        }
+        return new City(id);
     }
 }

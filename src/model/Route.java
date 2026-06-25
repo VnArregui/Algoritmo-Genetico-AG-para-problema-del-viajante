@@ -1,7 +1,9 @@
 package model;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public class Route {
 
@@ -50,6 +52,20 @@ public class Route {
 
     public void invalidateFitness() {
         this.fitness = 0;
+    }
+
+    /**
+     * Comprueba que la ruta sea una permutacion valida: visita cada id de ciudad
+     * exactamente una vez. Util como red de seguridad al probar operadores.
+     */
+    public boolean isValidPermutation() {
+        Set<Integer> seen = new HashSet<>();
+        for (City city : cities) {
+            if (!seen.add(city.getId())) {
+                return false; // id repetido
+            }
+        }
+        return seen.size() == cities.size();
     }
 
     @Override
