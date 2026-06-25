@@ -57,8 +57,6 @@ public class Selection {
         return selected;
     }
 
-
-
     // Seleccion por ranking de mapeo lineal: asigna probabilidades según el orden de fitness
     // SELECTION_PRESSURE controla cuánto más probable es elegir al mejor respecto al peor (1.0 = uniforme, 2.0 = el mejor 2 veces más probable que el peor)
     private static final double SELECTION_PRESSURE = 2.0;
