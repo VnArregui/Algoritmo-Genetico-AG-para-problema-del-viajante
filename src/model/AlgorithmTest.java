@@ -22,8 +22,13 @@ import java.util.Random;
 public class AlgorithmTest {
 
     // Numero de ejecuciones por configuracion (la busqueda es estocastica)
-    private static final int RUNS_PER_CONFIG = 10;
+    private static final int RUNS_PER_CONFIG = 20;
     private static final String CSV_FILE = "test-results.csv";
+
+    // Grafo unico y compartido: TODAS las configuraciones se prueban sobre el mismo grafo.
+    // Cambiar estos valores cambia el grafo para todos los casos.
+    private static final int GRAPH_SIZE = 100;
+    private static final int GRAPH_COST_RANGE = 149;
 
     /** Configuracion completa de parametros para una ejecucion del AE. */
     static class Config {
@@ -38,13 +43,10 @@ public class AlgorithmTest {
         final boolean survivalSelectionMethod; // true: round robin, false: fitness-based
         final CrossoverMethod crossoverMethod;
         final MutationMethod mutationMethod;
-        final int numberOfCities;
-        final int costRange;
 
         Config(String label, int populationSize, int initialPopulationMul, double crossoverRate,
                double mutationRate, int tournamentSize, int maxGenerations, boolean parentSelectionMethod,
-               boolean survivalSelectionMethod, CrossoverMethod crossoverMethod, MutationMethod mutationMethod,
-               int numberOfCities, int costRange) {
+               boolean survivalSelectionMethod, CrossoverMethod crossoverMethod, MutationMethod mutationMethod) {
             this.label = label;
             this.populationSize = populationSize;
             this.initialPopulationMul = initialPopulationMul;
@@ -56,8 +58,6 @@ public class AlgorithmTest {
             this.survivalSelectionMethod = survivalSelectionMethod;
             this.crossoverMethod = crossoverMethod;
             this.mutationMethod = mutationMethod;
-            this.numberOfCities = numberOfCities;
-            this.costRange = costRange;
         }
     }
 
@@ -72,60 +72,57 @@ public class AlgorithmTest {
     }
 
     // 5 casos de prueba del estudio. initialPopulationMul = poblacionInicial / populationSize.
-    // En todos los casos la cantidad de ciudades y los costes son los mismos
+    // Todos los casos comparten el mismo grafo (ver GRAPH_SIZE / GRAPH_COST_RANGE).
     private static final List<Config> CONFIGS = List.of(
         new Config(
-            "Caso 1", 
+            "Caso 1",
             100,
-            1, 
-            1.0, 
-            0.1, 
-            5,  
-            1000, 
-            true, 
-            false, 
-            CrossoverMethod.PMX, 
-            MutationMethod.SWAP,      
-            100, 
-            149
+            1,
+            1.0,
+            0.1,
+            5,
+            1000,
+            true,
+            false,
+            CrossoverMethod.PMX,
+            MutationMethod.SWAP
         ),
         new Config(
-            "Caso 2", 
-            100, 
-            5, 
-            1.0, 
-            0.1, 
-            5,  
-            2000, 
-            true, 
-            true,  
-            CrossoverMethod.PMX, 
-            MutationMethod.SHIFT,     
-            100, 
-            149
+            "Caso 2",
+            100,
+            5,
+            1.0,
+            0.1,
+            5,
+            2000,
+            true,
+            true,
+            CrossoverMethod.PMX,
+            MutationMethod.SHIFT
         ),
-        new Config("Caso 3", 100, 5, 0.9, 0.1, 5,  2000, true, false, CrossoverMethod.DPX, MutationMethod.SWAP,      100, 149),
-        new Config("Caso 4", 100, 5, 1.0, 0.1, 10, 2000, true, true,  CrossoverMethod.DPX, MutationMethod.INVERSION, 100, 149),
-        new Config("Caso 5", 200, 5, 0.9, 0.1, 5,  4000, true, true,  CrossoverMethod.DPX, MutationMethod.SWAP,      200, 149)
+        new Config("Caso 3", 100, 5, 0.9, 0.1, 5,  2000, true, false, CrossoverMethod.DPX, MutationMethod.SWAP),
+        new Config("Caso 4", 100, 5, 1.0, 0.1, 10, 2000, true, true,  CrossoverMethod.DPX, MutationMethod.INVERSION),
+        new Config("Caso 5", 200, 5, 0.9, 0.1, 5,  4000, true, true,  CrossoverMethod.DPX, MutationMethod.SWAP)
     );
 
     public static void main(String[] args) {
-        List<Result> results = new ArrayList<>();
+        // Grafo unico compartido por todas las configuraciones
+        List<City> cities = generateCities(GRAPH_SIZE);
+        double[][] costMatrix = generateCostMatrix(GRAPH_SIZE, GRAPH_COST_RANGE);
+        System.out.println("Grafo compartido: " + GRAPH_SIZE + " ciudades, rango de coste " + GRAPH_COST_RANGE + "\n");
 
+        List<Result> results = new ArrayList<>();
         for (Config config : CONFIGS) {
             System.out.println("Ejecutando " + config.label + " (" + RUNS_PER_CONFIG + " ejecuciones)...");
-            results.add(runConfig(config));
+            results.add(runConfig(config, cities, costMatrix));
         }
 
         printTable(results);
         writeCsv(results);
     }
 
-    /** Ejecuta una configuracion RUNS_PER_CONFIG veces y agrega las estadisticas. */
-    private static Result runConfig(Config config) {
-        List<City> cities = generateCities(config.numberOfCities);
-        double[][] costMatrix = generateCostMatrix(config.numberOfCities, config.costRange);
-
+    /** Ejecuta una configuracion RUNS_PER_CONFIG veces sobre el grafo compartido y agrega las estadisticas. */
+    private static Result runConfig(Config config, List<City> cities, double[][] costMatrix) {
         double[] costs = new double[RUNS_PER_CONFIG];
         double totalTimeMs = 0;
         boolean allValid = true;
@@ -219,7 +216,7 @@ public class AlgorithmTest {
                         c.populationSize, c.initialPopulationMul, c.tournamentSize, c.maxGenerations,
                         c.parentSelectionMethod ? "torneo" : "ranking",
                         c.survivalSelectionMethod ? "roundRobin" : "fitness",
-                        c.numberOfCities, c.costRange, RUNS_PER_CONFIG,
+                        GRAPH_SIZE, GRAPH_COST_RANGE, RUNS_PER_CONFIG,
                         r.best, r.average, r.worst, r.stdDev, r.avgTimeMs, r.allValid ? "si" : "no"));
             }
             System.out.println("\nResultados guardados en " + CSV_FILE);
