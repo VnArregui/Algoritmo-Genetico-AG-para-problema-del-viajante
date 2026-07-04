@@ -78,11 +78,11 @@ public class AlgorithmTest {
             "Caso 1",
             100,
             1,
-            1.0,
+            1,
             0.1,
             5,
-            1000,
-            true,
+            2000,
+            false,
             false,
             CrossoverMethod.PMX,
             MutationMethod.SWAP
@@ -90,7 +90,7 @@ public class AlgorithmTest {
         new Config(
             "Caso 2",
             100,
-            5,
+            1,
             1.0,
             0.1,
             5,
@@ -100,9 +100,10 @@ public class AlgorithmTest {
             CrossoverMethod.PMX,
             MutationMethod.SHIFT
         ),
-        new Config("Caso 3", 100, 5, 0.9, 0.1, 5,  2000, true, false, CrossoverMethod.DPX, MutationMethod.SWAP),
-        new Config("Caso 4", 100, 5, 1.0, 0.1, 10, 2000, true, true,  CrossoverMethod.DPX, MutationMethod.INVERSION),
-        new Config("Caso 5", 200, 5, 0.9, 0.1, 5,  4000, true, true,  CrossoverMethod.DPX, MutationMethod.SWAP)
+        new Config("Caso 3", 100, 1, 1.0, 0.1, 5,  2000, true, true, CrossoverMethod.PMX, MutationMethod.INVERSION),
+        new Config("Caso 4", 100, 1, 1.0, 0.1, 5, 2000, false, false,  CrossoverMethod.DPX, MutationMethod.SWAP),
+        new Config("Caso 5", 100, 1, 1.0, 0.1, 5,  2000, true, true,  CrossoverMethod.DPX, MutationMethod.SHIFT),
+        new Config("Caso 6", 100, 1, 1.0, 0.1, 5,  2000, true, true,  CrossoverMethod.DPX, MutationMethod.INVERSION)
     );
 
     public static void main(String[] args) {
