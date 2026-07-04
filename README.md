@@ -1,37 +1,35 @@
-# AE-1: Travelling Salesman Problem — Evolutionary Algorithm
+# AE-1: PROBLEMA DEL VIAJANTE - ALGORITMO GENETICO
 
-Solving the **Travelling Salesman Problem (TSP)** using an **Evolutionary Algorithm (EA)** implemented in Java.
+Resolucion del problema del viajante utilizando un *Algoritmo genetico*
+Implementado en Java 25 y testeado utilizando TSPLib kro100A
 
-## Project Structure
+# Ejecucion
 
-```
-src/
-├── Main.java                          Entry point
-├── model/
-│   ├── City.java                      City with (x, y) coordinates
-│   └── Route.java                     Candidate solution (ordered list of cities)
-└── ea/
-    ├── EvolutionaryAlgorithm.java     EA engine (population loop, elitism)
-    ├── Selection.java                 Tournament selection
-    ├── Crossover.java                 Order Crossover (OX)
-    └── Mutation.java                  Swap & inversion mutation
-```
+Primero compilar todo el proyecto:
 
-## How to Compile & Run
+    javac -d out src/Main.java src/model/*.java src/ea/*.java
 
-```bash
-cd src
-javac -d ../out model/*.java ea/*.java Main.java
-cd ../out
-java Main
-```
+## Main (ejecucion unica)
 
-## EA Parameters (configurable in Main.java)
+Correr main para ejecucion unica con los parametros asignados en el mismo.
 
-| Parameter        | Default |
-|------------------|---------|
-| Population size  | 100     |
-| Crossover rate   | 0.9     |
-| Mutation rate    | 0.1     |
-| Tournament size  | 5       |
-| Max generations  | 1000    |
+    java -cp out Main
+
+## AlgorithmTest (banco de pruebas)
+
+Para testeo extensivo se recomienda usar AlgorithmTest.java, donde se implemento un banco de pruebas
+definir configuraciones a testear y los parametros adicionales.
+
+    java -cp out model.AlgorithmTest
+
+Los resultados se dan por consola y un archivo con formato csv llamado "test-result.csv"
+
+# Avisos
+
+El algorimo se implemento con asistencia de Claude Sonnet y Claude Opus, su participacion se llevo a cabo
+durante el testeo, analizando el codigo del algoritmo en busqueda de errores y para generar el codigo del banco de pruebas
+para facilitar el testeo y que ademas sea mas facil de usar para los interesados.
+
+Se utilizaron los modelos de IA mencionados como asistencia para resolver dudas acerca de java y consultas de fuentes 
+acerca del tema (Bibliotecas o codigo ya existente acerca de los metodos utilizados), los dos casos donde me apoye
+en la IA generativa fue, utilizando le herramienta de autocompletado de Github Copilot, y en la construccion del metodo de cruce DPX (distance preserving crossover), con la intencion de llegar a la mejor implementacion del metodo en un tiempo razonable.
