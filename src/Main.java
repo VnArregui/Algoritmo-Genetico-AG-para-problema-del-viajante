@@ -72,7 +72,7 @@ public class Main {
         double[][] matrix = new double[size][size];
         for (int i = 0; i < size; i++) {
             for (int j = i + 1; j < size; j++) {
-                double cost = 1 + random.nextDouble() * costRange; // coste entre 1 y 100
+                double cost = 1 + random.nextInt(costRange); // coste entero entre 1 y 100
                 matrix[i][j] = cost;
                 matrix[j][i] = cost;
             }
