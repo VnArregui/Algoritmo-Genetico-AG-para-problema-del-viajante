@@ -7,6 +7,8 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -29,6 +31,13 @@ public class AlgorithmTest {
     // Cambiar estos valores cambia el grafo para todos los casos.
     private static final int GRAPH_SIZE = 100;
     private static final int GRAPH_COST_RANGE = 149;
+
+    // Modo benchmark: usar una instancia real de TSPLIB con optimo conocido en lugar del grafo
+    // aleatorio. Permite medir la distancia al optimo (gap %) del algoritmo.
+    private static final boolean USE_BENCHMARK = true;
+    private static final String BENCHMARK_FILE = "data/kroA100.tsp";
+    private static final String BENCHMARK_OPT_TOUR = "data/kroA100.opt.tour";
+    private static final double KNOWN_OPTIMUM = 21282; // optimo probado de kroA100
 
     /** Configuracion completa de parametros para una ejecucion del AE. */
     static class Config {
@@ -71,46 +80,31 @@ public class AlgorithmTest {
         boolean allValid;
     }
 
-    // 5 casos de prueba del estudio. initialPopulationMul = poblacionInicial / populationSize.
-    // Todos los casos comparten el mismo grafo (ver GRAPH_SIZE / GRAPH_COST_RANGE).
+    // Comparacion contra el optimo conocido (kroA100): mejor PMX vs mejor DPX.
+    // Base: pob=100, mul=1, torneo=5, 2000 generaciones, cruce=1.0, supervivientes=round robin.
     private static final List<Config> CONFIGS = List.of(
-        new Config(
-            "Caso 1",
-            100,
-            1,
-            1,
-            0.1,
-            5,
-            2000,
-            false,
-            false,
-            CrossoverMethod.PMX,
-            MutationMethod.SWAP
-        ),
-        new Config(
-            "Caso 2",
-            100,
-            1,
-            1.0,
-            0.1,
-            5,
-            2000,
-            true,
-            true,
-            CrossoverMethod.PMX,
-            MutationMethod.SHIFT
-        ),
-        new Config("Caso 3", 100, 1, 1.0, 0.1, 5,  2000, true, true, CrossoverMethod.PMX, MutationMethod.INVERSION),
-        new Config("Caso 4", 100, 1, 1.0, 0.1, 5, 2000, false, false,  CrossoverMethod.DPX, MutationMethod.SWAP),
-        new Config("Caso 5", 100, 1, 1.0, 0.1, 5,  2000, true, true,  CrossoverMethod.DPX, MutationMethod.SHIFT),
-        new Config("Caso 6", 100, 1, 1.0, 0.1, 5,  2000, true, true,  CrossoverMethod.DPX, MutationMethod.INVERSION)
+        new Config("PMX+INV", 100, 1, 1.0, 0.30, 5, 2000, true, true, CrossoverMethod.PMX, MutationMethod.INVERSION),
+        new Config("DPX+INV", 100, 1, 1.0, 0.10, 5, 2000, true, true, CrossoverMethod.DPX, MutationMethod.INVERSION)
     );
 
-    public static void main(String[] args) {
-        // Grafo unico compartido por todas las configuraciones
-        List<City> cities = generateCities(GRAPH_SIZE);
-        double[][] costMatrix = generateCostMatrix(GRAPH_SIZE, GRAPH_COST_RANGE);
-        System.out.println("Grafo compartido: " + GRAPH_SIZE + " ciudades, rango de coste " + GRAPH_COST_RANGE + "\n");
+    public static void main(String[] args) throws IOException {
+        List<City> cities;
+        double[][] costMatrix;
+
+        if (USE_BENCHMARK) {
+            costMatrix = loadTsplibEuc2d(BENCHMARK_FILE);
+            cities = generateCities(costMatrix.length); // ciudades 0..n-1, la geometria esta en la matriz
+            // Validacion del cargador: el coste del tour optimo bajo NUESTRA matriz debe dar el optimo publicado
+            Route optimalTour = loadOptimalTour(BENCHMARK_OPT_TOUR, costMatrix);
+            System.out.println("Instancia benchmark: " + BENCHMARK_FILE + " (" + costMatrix.length + " ciudades)");
+            System.out.println("Optimo publicado: " + KNOWN_OPTIMUM
+                    + " | Coste del tour optimo con nuestra matriz: " + String.format(Locale.US, "%.0f", optimalTour.getTotalCost())
+                    + (optimalTour.getTotalCost() == KNOWN_OPTIMUM ? "  [OK]" : "  [ERROR: no coincide]") + "\n");
+        } else {
+            costMatrix = generateCostMatrix(GRAPH_SIZE, GRAPH_COST_RANGE);
+            cities = generateCities(GRAPH_SIZE);
+            System.out.println("Grafo compartido: " + GRAPH_SIZE + " ciudades, rango de coste " + GRAPH_COST_RANGE + "\n");
+        }
 
         List<Result> results = new ArrayList<>();
         for (Config config : CONFIGS) {
@@ -185,9 +179,9 @@ public class AlgorithmTest {
 
     private static void printTable(List<Result> results) {
         System.out.println("\n=== Resultados (" + RUNS_PER_CONFIG + " ejecuciones por caso) ===");
-        String header = String.format("%-8s %-6s %-6s %-12s %-6s %-7s %-6s %-9s %-10s %-10s %-10s %-9s %-10s %-7s",
-                "Caso", "Cruce", "%X", "Mutacion", "%M", "Pob", "Torn", "Superv.",
-                "Mejor", "Promedio", "Peor", "DesvEst", "Tiempo(ms)", "Valido");
+        String header = String.format("%-8s %-6s %-6s %-12s %-6s %-7s %-6s %-6s %-10s %-9s %-10s %-10s %-10s %-9s %-10s %-9s %-9s %-7s",
+                "Caso", "Cruce", "%X", "Mutacion", "%M", "Pob", "Torn", "Gen", "Sel.Padres", "Superv.",
+                "Mejor", "Promedio", "Peor", "DesvEst", "Tiempo(ms)", "GapMej%", "GapProm%", "Valido");
         System.out.println(header);
         System.out.println("-".repeat(header.length()));
 
@@ -195,30 +189,42 @@ public class AlgorithmTest {
             Config c = CONFIGS.get(i);
             Result r = results.get(i);
             System.out.println(String.format(Locale.US,
-                    "%-8s %-6s %-6.2f %-12s %-6.2f %-7d %-6d %-9s %-10.2f %-10.2f %-10.2f %-9.2f %-10.1f %-7s",
+                    "%-8s %-6s %-6.2f %-12s %-6.2f %-7d %-6d %-6d %-10s %-9s %-10.2f %-10.2f %-10.2f %-9.2f %-10.1f %-9s %-9s %-7s",
                     c.label, c.crossoverMethod, c.crossoverRate, c.mutationMethod, c.mutationRate,
-                    c.populationSize, c.tournamentSize,
+                    c.populationSize, c.tournamentSize, c.maxGenerations,
+                    c.parentSelectionMethod ? "torneo" : "ranking",
                     c.survivalSelectionMethod ? "roundRob" : "fitness",
-                    r.best, r.average, r.worst, r.stdDev, r.avgTimeMs, r.allValid ? "si" : "NO"));
+                    r.best, r.average, r.worst, r.stdDev, r.avgTimeMs,
+                    gapString(r.best), gapString(r.average), r.allValid ? "si" : "NO"));
         }
+    }
+
+    /** Gap porcentual respecto al optimo conocido, o "-" si no estamos en modo benchmark. */
+    private static String gapString(double value) {
+        if (!USE_BENCHMARK) {
+            return "-";
+        }
+        return String.format(Locale.US, "%.2f", (value - KNOWN_OPTIMUM) / KNOWN_OPTIMUM * 100);
     }
 
     private static void writeCsv(List<Result> results) {
         try (FileWriter w = new FileWriter(CSV_FILE)) {
             w.write("caso,crossover,crossoverRate,mutation,mutationRate,populationSize,initialPopulationMul,"
                     + "tournamentSize,maxGenerations,parentSelection,survivalSelection,numberOfCities,costRange,"
-                    + "runs,best,average,worst,stdDev,avgTimeMs,allValid\n");
+                    + "runs,best,average,worst,stdDev,avgTimeMs,optimum,gapBestPct,gapAvgPct,allValid\n");
+            String optimum = USE_BENCHMARK ? String.format(Locale.US, "%.0f", KNOWN_OPTIMUM) : "-";
             for (int i = 0; i < CONFIGS.size(); i++) {
                 Config c = CONFIGS.get(i);
                 Result r = results.get(i);
                 w.write(String.format(Locale.US,
-                        "%s,%s,%.2f,%s,%.2f,%d,%d,%d,%d,%s,%s,%d,%d,%d,%.4f,%.4f,%.4f,%.4f,%.2f,%s\n",
+                        "%s,%s,%.2f,%s,%.2f,%d,%d,%d,%d,%s,%s,%d,%d,%d,%.4f,%.4f,%.4f,%.4f,%.2f,%s,%s,%s,%s\n",
                         c.label, c.crossoverMethod, c.crossoverRate, c.mutationMethod, c.mutationRate,
                         c.populationSize, c.initialPopulationMul, c.tournamentSize, c.maxGenerations,
                         c.parentSelectionMethod ? "torneo" : "ranking",
                         c.survivalSelectionMethod ? "roundRobin" : "fitness",
                         GRAPH_SIZE, GRAPH_COST_RANGE, RUNS_PER_CONFIG,
-                        r.best, r.average, r.worst, r.stdDev, r.avgTimeMs, r.allValid ? "si" : "no"));
+                        r.best, r.average, r.worst, r.stdDev, r.avgTimeMs,
+                        optimum, gapString(r.best), gapString(r.average), r.allValid ? "si" : "no"));
             }
             System.out.println("\nResultados guardados en " + CSV_FILE);
         } catch (IOException e) {
@@ -246,5 +252,72 @@ public class AlgorithmTest {
             }
         }
         return matrix;
+    }
+
+    /**
+     * Carga una instancia TSPLIB con EDGE_WEIGHT_TYPE = EUC_2D y construye la matriz de costes.
+     * La distancia es d(i,j) = nint(sqrt(dx^2 + dy^2)) (redondeo al entero mas cercano), igual que
+     * usa TSPLIB para calcular los optimos publicados. Las coordenadas solo se usan aqui para
+     * construir la matriz; las ciudades siguen siendo ids 0..n-1.
+     */
+    private static double[][] loadTsplibEuc2d(String path) throws IOException {
+        List<String> lines = Files.readAllLines(Path.of(path));
+        int n = 0;
+        int coordStart = -1;
+        for (int i = 0; i < lines.size(); i++) {
+            String line = lines.get(i).trim();
+            if (line.startsWith("DIMENSION")) {
+                n = Integer.parseInt(line.substring(line.indexOf(':') + 1).trim());
+            } else if (line.equals("NODE_COORD_SECTION")) {
+                coordStart = i + 1;
+                break;
+            }
+        }
+        if (n <= 0 || coordStart < 0) {
+            throw new IOException("Formato TSPLIB no valido en " + path);
+        }
+
+        double[] x = new double[n];
+        double[] y = new double[n];
+        for (int k = 0; k < n; k++) {
+            String[] parts = lines.get(coordStart + k).trim().split("\\s+");
+            int idx = Integer.parseInt(parts[0]) - 1; // TSPLIB es 1-based
+            x[idx] = Double.parseDouble(parts[1]);
+            y[idx] = Double.parseDouble(parts[2]);
+        }
+
+        double[][] matrix = new double[n][n];
+        for (int i = 0; i < n; i++) {
+            for (int j = i + 1; j < n; j++) {
+                double dx = x[i] - x[j];
+                double dy = y[i] - y[j];
+                double d = Math.round(Math.sqrt(dx * dx + dy * dy)); // nint
+                matrix[i][j] = d;
+                matrix[j][i] = d;
+            }
+        }
+        return matrix;
+    }
+
+    /**
+     * Carga el tour optimo de un fichero TSPLIB .opt.tour (TOUR_SECTION, ids 1-based terminados
+     * en -1) y devuelve la ruta correspondiente construida con la matriz dada.
+     */
+    private static Route loadOptimalTour(String path, double[][] costMatrix) throws IOException {
+        List<String> lines = Files.readAllLines(Path.of(path));
+        List<City> tour = new ArrayList<>();
+        boolean inTour = false;
+        for (String raw : lines) {
+            String line = raw.trim();
+            if (line.equals("TOUR_SECTION")) {
+                inTour = true;
+            } else if (inTour) {
+                if (line.equals("-1") || line.equals("EOF") || line.isEmpty()) {
+                    break;
+                }
+                tour.add(new City(Integer.parseInt(line) - 1)); // 1-based -> 0-based
+            }
+        }
+        return new Route(tour, costMatrix);
     }
 }
