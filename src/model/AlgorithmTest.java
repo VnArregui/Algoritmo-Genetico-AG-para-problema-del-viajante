@@ -14,12 +14,21 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Random;
 
-// ############# Test implementado con Claude Opus 4.8 de Anthropic ############# 
+// ############# Test implementado con ayuda de Claude Opus 4.8 ############# 
 /**
- * Banco de pruebas para el estudio: ejecuta cada configuracion de parametros
- * varias veces (la busqueda es estocastica) y reporta el mejor / promedio / peor
- * coste, la desviacion estandar y el tiempo medio. Imprime una tabla por consola
- * y vuelca los resultados a 'test-results.csv'.
+ * ===================== COMO PROBAR CONFIGURACIONES =====================
+ *  1. Compilar (desde la raiz del proyecto):  javac -d out src/Main.java src/model/*.java src/ea/*.java
+ *  2. Ejecutar:                               java -cp out model.AlgorithmTest
+ *
+ *  Que se puede cambiar:
+ *   - CONFIGS (mas abajo): anadir/editar una linea "new Config(...)" por cada prueba.
+ *   - USE_BENCHMARK: true  -> usa la instancia real kroA100 y muestra la distancia al optimo (Gap%).
+ *                    false -> usa un grafo aleatorio (ver GRAPH_SIZE / GRAPH_COST_RANGE).
+ *   - RUNS_PER_CONFIG: cuantas veces se repite cada configuracion. Calcula el promedio y la desviacion estandar de todas
+ *                      las ejecuciones.
+ *
+ *  Los resultados salen por consola (tabla) y en el fichero test-results.csv.
+ * =======================================================================
  */
 public class AlgorithmTest {
 
@@ -80,11 +89,30 @@ public class AlgorithmTest {
         boolean allValid;
     }
 
-    // Comparacion contra el optimo conocido (kroA100): mejor PMX vs mejor DPX.
-    // Base: pob=100, mul=1, torneo=5, 2000 generaciones, cruce=1.0, supervivientes=round robin.
+    // ===== LEYENDA de los parametros de Config (en este orden) =====
+    // new Config(
+    //     label,            etiqueta que aparece en la tabla (texto libre)
+    //     poblacion,        tamano de la poblacion (mu), p.ej. 100
+    //     iniMul,           multiplicador de poblacion inicial (poblacionInicial / poblacion), p.ej. 1
+    //     %cruce,           probabilidad de cruce [0.0 - 1.0]
+    //     %mutacion,        probabilidad de mutacion [0.0 - 1.0]
+    //     torneo,           tamano del torneo, p.ej. 5
+    //     generaciones,     numero de generaciones, p.ej. 2000
+    //     padres,           seleccion de padres: true = torneo, false = ranking lineal
+    //     supervivientes,   seleccion de supervivientes: true = round robin, false = por fitness
+    //     cruce,            CrossoverMethod.PMX o CrossoverMethod.DPX (tambien existe ORDER/OX)
+    //     mutacion)         MutationMethod.SWAP, .INVERSION o .SHIFT
+    //
+    // Grid de operadores: 2 cruces (PMX, DPX) x 3 mutaciones (SWAP, INVERSION, SHIFT).
+    // Misma base para todos (pob=100, mul=1, cruce=1.0, mut=0.10, torneo=5, 2000 gen,
+    // padres=torneo, supervivientes=round robin) para que SOLO cambien los operadores.
     private static final List<Config> CONFIGS = List.of(
-        new Config("PMX+INV", 100, 1, 1.0, 0.30, 5, 2000, true, true, CrossoverMethod.PMX, MutationMethod.INVERSION),
-        new Config("DPX+INV", 100, 1, 1.0, 0.10, 5, 2000, true, true, CrossoverMethod.DPX, MutationMethod.INVERSION)
+        new Config("PMX+SWAP", 100, 1, 1.0, 0.10, 5, 2000, true, true, CrossoverMethod.PMX, MutationMethod.SWAP),
+        new Config("PMX+INV",  100, 1, 1.0, 0.10, 5, 2000, true, true, CrossoverMethod.PMX, MutationMethod.INVERSION),
+        new Config("PMX+SHIFT", 100, 1, 1.0, 0.10, 5, 2000, true, true, CrossoverMethod.PMX, MutationMethod.SHIFT),
+        new Config("DPX+SWAP", 100, 1, 1.0, 0.10, 5, 2000, true, true, CrossoverMethod.DPX, MutationMethod.SWAP),
+        new Config("DPX+INV",  100, 1, 1.0, 0.10, 5, 2000, true, true, CrossoverMethod.DPX, MutationMethod.INVERSION),
+        new Config("DPX+SHIFT", 100, 1, 1.0, 0.10, 5, 2000, true, true, CrossoverMethod.DPX, MutationMethod.SHIFT)
     );
 
     public static void main(String[] args) throws IOException {
@@ -106,14 +134,19 @@ public class AlgorithmTest {
             System.out.println("Grafo compartido: " + GRAPH_SIZE + " ciudades, rango de coste " + GRAPH_COST_RANGE + "\n");
         }
 
+        long suiteStart = System.nanoTime();
         List<Result> results = new ArrayList<>();
         for (Config config : CONFIGS) {
             System.out.println("Ejecutando " + config.label + " (" + RUNS_PER_CONFIG + " ejecuciones)...");
             results.add(runConfig(config, cities, costMatrix));
         }
+        double suiteSeconds = (System.nanoTime() - suiteStart) / 1_000_000_000.0;
 
         printTable(results);
         writeCsv(results);
+        System.out.println(String.format(Locale.US,
+                "%nTiempo total de ejecucion: %.2f s (%d configuraciones x %d ejecuciones = %d corridas)",
+                suiteSeconds, CONFIGS.size(), RUNS_PER_CONFIG, CONFIGS.size() * RUNS_PER_CONFIG));
     }
 
     /** Ejecuta una configuracion RUNS_PER_CONFIG veces sobre el grafo compartido y agrega las estadisticas. */
@@ -181,7 +214,7 @@ public class AlgorithmTest {
         System.out.println("\n=== Resultados (" + RUNS_PER_CONFIG + " ejecuciones por caso) ===");
         String header = String.format("%-8s %-6s %-6s %-12s %-6s %-7s %-6s %-6s %-10s %-9s %-10s %-10s %-10s %-9s %-10s %-9s %-9s %-7s",
                 "Caso", "Cruce", "%X", "Mutacion", "%M", "Pob", "Torn", "Gen", "Sel.Padres", "Superv.",
-                "Mejor", "Promedio", "Peor", "DesvEst", "Tiempo(ms)", "GapMej%", "GapProm%", "Valido");
+                "Mejor", "Promedio", "Peor", "DesvEst", "ms/ejec", "GapMej%", "GapProm%", "Valido");
         System.out.println(header);
         System.out.println("-".repeat(header.length()));
 
