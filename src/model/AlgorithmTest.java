@@ -239,7 +239,7 @@ public class AlgorithmTest {
         double[][] matrix = new double[size][size];
         for (int i = 0; i < size; i++) {
             for (int j = i + 1; j < size; j++) {
-                double cost = 1 + random.nextDouble() * costRange;
+                double cost = 1 + random.nextInt(costRange); // coste entero entre 1 y costRange
                 matrix[i][j] = cost;
                 matrix[j][i] = cost; // simetrico
             }
