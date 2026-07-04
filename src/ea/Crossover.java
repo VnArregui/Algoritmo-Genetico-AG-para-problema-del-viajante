@@ -2,6 +2,7 @@ package ea;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -111,9 +112,14 @@ public class Crossover {
         };
     }
 
-    // Distance Preserving Crossover (DPX).
-    // Fragment-building adapted from Epsilon2/Memetic-Algorithm-for-TSP (MIT license).
-    // Reconnection follows Freisleben & Merz (1996): prefers P1/P2 successor edges.
+
+    // Implementado con asistencia de Claude Opus 4.8
+    // Distance Preserving Crossover (DPX) - version de libro de texto (Freisleben & Merz).
+    // Fragment-building y reconexion adaptados de Epsilon2/Memetic-Algorithm-for-TSP (MIT license):
+    // se preservan las aristas comunes a ambos padres y los fragmentos se reconectan por vecino
+    // mas cercano (getNearestCity), introduciendo aristas nuevas en lugar de reutilizar las de los
+    // padres. Nota: esta version practica no prohibe estrictamente reintroducir una arista de un
+    // padre (la variante teorica si; Merz indica que el backtracking para forzarlo "no vale la pena").
     public static Route distancePreservingCrossover(Route parent1, Route parent2) {
         List<City> p1 = parent1.getCities();
         List<City> p2 = parent2.getCities();
@@ -146,68 +152,59 @@ public class Crossover {
             fragments.add(frag);
         }
 
-        // Build city-by-ID lookup and successor maps
+        // Build city-by-ID lookup
         City[] cityById = new City[n];
-        int[] succ1 = new int[n];
-        int[] succ2 = new int[n];
         for (int i = 0; i < n; i++) {
             City c = p1.get(i);
             cityById[c.getId()] = c;
-            succ1[c.getId()] = p1.get((i + 1) % n).getId();
-            succ2[p2.get(i).getId()] = p2.get((i + 1) % n).getId();
         }
 
-        // Reconnect fragments greedily into a complete tour
+        // Reconnect fragments by nearest neighbour (vecino mas cercano), como en Epsilon2.
+        // Desde el extremo actual del recorrido se elige el fragmento no usado cuyo extremo
+        // (cabeza o cola) este mas cerca segun la matriz de costes, introduciendo aristas nuevas.
+        double[][] costMatrix = parent1.getCostMatrix();
         boolean[] used = new boolean[fragments.size()];
         List<City> child = new ArrayList<>();
-        int current = 0;
 
-        for (int step = 0; step < fragments.size(); step++) {
-            used[current] = true;
-            List<Integer> frag = fragments.get(current);
-            for (int id : frag) child.add(cityById[id]);
+        // Empezamos con el primer fragmento
+        used[0] = true;
+        for (int id : fragments.get(0)) child.add(cityById[id]);
+        int end = fragments.get(0).get(fragments.get(0).size() - 1);
 
-            if (step == fragments.size() - 1) break;
+        for (int placed = 1; placed < fragments.size(); placed++) {
+            int bestFrag = -1;
+            boolean connectByTail = false;
+            double bestDist = Double.MAX_VALUE;
 
-            int tail = frag.get(frag.size() - 1);
-
-            // Prefer fragment whose head matches P1/P2 successor of tail
-            current = -1;
             for (int j = 0; j < fragments.size(); j++) {
                 if (used[j]) continue;
-                int head = fragments.get(j).get(0);
-                if (head == succ1[tail] || head == succ2[tail]) {
-                    current = j;
-                    break;
+                List<Integer> f = fragments.get(j);
+                int head = f.get(0);
+                int tail = f.get(f.size() - 1);
+                if (costMatrix[end][head] < bestDist) {
+                    bestDist = costMatrix[end][head];
+                    bestFrag = j;
+                    connectByTail = false;
+                }
+                if (costMatrix[end][tail] < bestDist) {
+                    bestDist = costMatrix[end][tail];
+                    bestFrag = j;
+                    connectByTail = true;
                 }
             }
 
-            // If not found, prefer fragment whose tail matches (reverse it)
-            if (current == -1) {
-                for (int j = 0; j < fragments.size(); j++) {
-                    if (used[j]) continue;
-                    List<Integer> f = fragments.get(j);
-                    int ft = f.get(f.size() - 1);
-                    if (ft == succ1[tail] || ft == succ2[tail]) {
-                        List<Integer> rev = new ArrayList<>(f.size());
-                        for (int idx = f.size() - 1; idx >= 0; idx--)
-                            rev.add(f.get(idx));
-                        fragments.set(j, rev);
-                        current = j;
-                        break;
-                    }
-                }
+            used[bestFrag] = true;
+            List<Integer> f = fragments.get(bestFrag);
+            // Si el extremo mas cercano era la cola, invertimos el fragmento para que su
+            // cabeza (ahora el antiguo extremo cercano) conecte con el recorrido actual.
+            if (connectByTail) {
+                Collections.reverse(f);
             }
-
-            // Fallback: any unused fragment
-            if (current == -1) {
-                for (int j = 0; j < fragments.size(); j++) {
-                    if (!used[j]) { current = j; break; }
-                }
-            }
+            for (int id : f) child.add(cityById[id]);
+            end = f.get(f.size() - 1);
         }
 
-        return new Route(child, parent1.getCostMatrix());
+        return new Route(child, costMatrix);
     }
 
     private static City resolveMapping(City city, Map<Integer, Integer> map, Set<Integer> segment) {
